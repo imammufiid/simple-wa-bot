@@ -1,4 +1,5 @@
 const {hidePrivateData} = require('./utils/utils')
+const {gptCompletion} = require('./gpt/chat.gpt')
 const makeWaSocket = require('@adiwajshing/baileys').default
 const {
     DisconnectReason, useMultiFileAuthState
@@ -26,6 +27,33 @@ async function init() {
             console.log(e)
             return ''
         }
+    }
+
+    const handleGuideMessage = async (msg) => {
+        const {key, message} = msg
+        const text = getText(message)
+
+        const MIMIN_PREFIX = "!guide"
+        if (!text.startsWith(MIMIN_PREFIX)) return
+
+        let reply = "!mimin(start with): Untuk memanggil mimin\n"+ "@all: Untuk tag semua member group\n"+ "!yeyen(start with): Untuk memulai chat gpt\n\n"
+        sendMessage(key.remoteJid, {text: reply}, {quoted: msg})
+    }
+
+    const handleGPTMessage = async (msg) => {
+        const {key, message} = msg
+        const text = getText(message)
+
+        const MIMIN_PREFIX = "!yeyen"
+        if (!text.startsWith(MIMIN_PREFIX)) return
+
+        let chat = text.slice(MIMIN_PREFIX.length, text.length)
+        if (chat === "") return
+
+        let completion = await gptCompletion(chat)
+        let cleanedText = completion.data.choices[0].message.content.replace(/\\n/g, "\n").replace(/\\"/g, "\"");
+        console.log(cleanedText)
+        sendMessage(key.remoteJid, {text: cleanedText}, {quoted: msg})
     }
 
     const sendMessage = async (jid, content, ...args) => {
@@ -63,8 +91,9 @@ async function init() {
         const items = []
 
         members.forEach(({ id, admin }) => {
+            console.log(id)
             mentions.push(id)
-            items.push(`@${id.slice(0, 13)}${admin ? ' *(ADMIN)* ' : ''}`)
+            items.push(`@${id.split("@")[0]}${admin ? ' *(ADMIN)* ' : ''}`)
         })
 
         sendMessage(
@@ -99,6 +128,7 @@ async function init() {
                 console.log(hidePrivateData(msg))
                 handleTagAllMemberInGroup(msg)
                 handleMiminMessage(msg)
+                handleGPTMessage(msg)
             })
         }
     })
