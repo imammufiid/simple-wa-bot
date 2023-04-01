@@ -29,20 +29,20 @@ const getText = (message) => {
     }
 }
 
-const handleActivationGPT = async (msg) => {
+const handleActivationGPT = async (msg, socket) => {
     const {key, pushName, message} = msg
     const text = getText(message)
 
-    const startWithActive = text === PREFIX_ACTIVE
-    const startWithInactive = text === PREFIX_INACTIVE
+    const startWithActive = text === ACTIVE_PREFIX
+    const startWithInactive = text === INACTIVE_PREFIX
 
     if (pushName === 'Imam Mufiid') {
         if (startWithActive) {
             if (GPT_ACTIVE === false) {
                 GPT_ACTIVE = true
-                sendMessage(key.remoteJid, {text: "Oke siap noted Pak Bos fitur GPT sudah diaktifkan"}, {quoted: msg})
+                sendMessage(socket, key.remoteJid, {text: "Oke siap noted Pak Bos fitur GPT sudah diaktifkan"}, {quoted: msg})
             } else {
-                sendMessage(key.remoteJid, {text: "Sorry Pak Bos fitur GPT sudah aktif"}, {quoted: msg})
+                sendMessage(socket, key.remoteJid, {text: "Sorry Pak Bos fitur GPT sudah aktif"}, {quoted: msg})
             }
             return
         }
@@ -50,31 +50,31 @@ const handleActivationGPT = async (msg) => {
         if (startWithInactive) {
             if (GPT_ACTIVE === true) {
                 GPT_ACTIVE = false
-                sendMessage(key.remoteJid, {text: "Oke siap noted Pak Bos fitur GPT sudah dinonaktifkan"}, {quoted: msg})
+                sendMessage(socket, key.remoteJid, {text: "Oke siap noted Pak Bos fitur GPT sudah dinonaktifkan"}, {quoted: msg})
             } else {
-                sendMessage(key.remoteJid, {text: "Sorry Pak Bos fitur GPT sudah tidak aktif"}, {quoted: msg})
+                sendMessage(socket, key.remoteJid, {text: "Sorry Pak Bos fitur GPT sudah tidak aktif"}, {quoted: msg})
             }
         }
 
     } else {
         if (key.fromMe === true) return
-        sendMessage(key.remoteJid, {text: "```Exception in thread \"main\" IllegalArgumentException: Maaf anda bukan Pak Bos```"}, {quoted: msg})
+        sendMessage(socket, key.remoteJid, {text: "```Exception in thread \"main\" IllegalArgumentException: Maaf anda bukan Pak Bos```"}, {quoted: msg})
     }
 }
 
-const handleGPTMessage = async (msg) => {
+const handleGPTMessage = async (msg, socket) => {
     const {key, message} = msg
     const text = getText(message)
 
     const groupRemoteJis = "@g.us"
     if (!key.remoteJid.endsWith(groupRemoteJis)) {
-        sendMessage(key.remoteJid, {text: "GPT tidak bisa digunakan di chat pribadi"}, {quoted: msg})
+        sendMessage(socket, key.remoteJid, {text: "GPT tidak bisa digunakan di chat pribadi"}, {quoted: msg})
         return
     }
 
     if (GPT_ACTIVE === false) {
         let reply = "Mohon maaf GPT sedang tidur..., tunggu sampai developer mengubah env ```GPT_ACTIVE``` ke ```true```"
-        sendMessage(key.remoteJid, {text: reply}, {quoted: msg})
+        sendMessage(socket, key.remoteJid, {text: reply}, {quoted: msg})
         return
     }
 
@@ -84,30 +84,30 @@ const handleGPTMessage = async (msg) => {
     let completion = await gptCompletion(chat)
     let cleanedText = completion.data.choices[0].message.content.replace(/\\n/g, "\n").replace(/\\"/g, "\"");
     console.log(cleanedText)
-    sendMessage(key.remoteJid, {text: cleanedText}, {quoted: msg})
+    sendMessage(socket, key.remoteJid, {text: cleanedText}, {quoted: msg})
 }
 
-const sendMessage = async (jid, content, ...args) => {
+const sendMessage = async (socket, jid, content, ...args) => {
     try {
-        const sent = await sock.sendMessage(jid, content, ...args)
+        const sent = await socket.sendMessage(jid, content, ...args)
         store[sent.key.id] = sent
     } catch (e) {
         console.log("Error sending message: ", e)
     }
 }
 
-const handleMiminMessage = async (msg) => {
+const handleMiminMessage = async (msg, socket) => {
     const {key} = msg
 
     const reply = "Daleemm sayang..."
-    sendMessage(key.remoteJid, {text: reply}, {quoted: msg})
+    sendMessage(socket, key.remoteJid, {text: reply}, {quoted: msg})
 }
 
-const handleTagAllMemberInGroup = async (msg) => {
+const handleTagAllMemberInGroup = async (msg, socket) => {
     const {key} = msg
 
     // 1. Get group members
-    const group = await sock.groupMetadata(key.remoteJid)
+    const group = await socket.groupMetadata(key.remoteJid)
     const members = group.participants
 
     // 2. Tag them and reply
@@ -121,13 +121,14 @@ const handleTagAllMemberInGroup = async (msg) => {
     })
 
     sendMessage(
+        socket,
         key.remoteJid,
         {text: "Daftar member group: \n\n" + items.join("\n") + `\n\nTotal member: *${mentions.length}*`, mentions},
         {quoted: msg}
     )
 }
 
-const handleMessage = async (msg) => {
+const handleMessage = async (msg, socket) => {
     const {key, message} = msg
     const text = getText(message)
 
@@ -138,26 +139,28 @@ const handleMessage = async (msg) => {
     if (!key.remoteJid.endsWith(groupRemoteJis)) return
 
     if (text.toLowerCase().includes("@all")) {
-        handleTagAllMemberInGroup(msg)
+        handleTagAllMemberInGroup(msg, socket)
     } else if (text.startsWith(MIMIN_PREFIX)) {
-        handleMiminMessage(msg)
+        handleMiminMessage(msg, socket)
     } else if (text.startsWith(GPT_PREFIX)) {
-        handleGPTMessage(msg)
+        handleGPTMessage(msg, socket)
     } else if (startWithActive || startWithInactive) {
-        handleActivationGPT(msg)
+        handleActivationGPT(msg, socket)
     } else if (text.startsWith(GPT_STATUS_PREFIX)) {
         const reply = `STATUS GPT: ${GPT_ACTIVE ? "*Active*" : "*Tidak aktif*"}`
-        sendMessage(key.remoteJid, {text: reply}, {quoted: msg})
+        sendMessage(socket, key.remoteJid, {text: reply}, {quoted: msg})
     }
 }
 
 const createWaBot = async () => {
-    const {state, saveCreds} = await useMultiFileAuthState('auth')
+    const {state, saveCreds} =await useMultiFileAuthState('auth')
+
     const sock = makeWaSocket({
         printQRInTerminal: true,
         auth: state,
         getMessage,
     })
+
     sock.ev.process(async (events) => {
         if (events["connection.update"]) {
             const {connection, lastDisconnect} = events["connection.update"]
@@ -181,7 +184,7 @@ const createWaBot = async () => {
                 if (!msg.message) return
                 // processing
                 console.log(hidePrivateData(msg))
-                handleMessage(msg)
+                handleMessage(msg, sock)
             })
         }
     })
