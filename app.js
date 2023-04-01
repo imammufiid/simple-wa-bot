@@ -6,6 +6,12 @@ const {
 } = require('@adiwajshing/baileys')
 
 const store = {}
+let GPT_ACTIVE = false
+const MIMIN_PREFIX = "!mimin"
+const GPT_PREFIX = "!gpt"
+const GPT_STATUS_PREFIX = "!statusgpt"
+const PREFIX_ACTIVE = "!activategpt"
+const PREFIX_INACTIVE = "!deactivategpt"
 
 const getMessage = key => {
     const {id} = key
@@ -29,23 +35,48 @@ async function init() {
         }
     }
 
-    const handleGuideMessage = async (msg) => {
-        const {key, message} = msg
+    const handleActivationGPT = async (msg) => {
+        const {key, pushName, message} = msg
         const text = getText(message)
 
-        const MIMIN_PREFIX = "!guide"
-        if (!text.startsWith(MIMIN_PREFIX)) return
+        const startWithActive = text === PREFIX_ACTIVE
+        const startWithInactive = text === PREFIX_INACTIVE
 
-        let reply = "!mimin(start with): Untuk memanggil mimin\n"+ "@all: Untuk tag semua member group\n"+ "!yeyen(start with): Untuk memulai chat gpt\n\n"
-        sendMessage(key.remoteJid, {text: reply}, {quoted: msg})
+        if (pushName === 'Imam Mufiid') {
+            if (startWithActive) {
+                if (GPT_ACTIVE === false) {
+                    GPT_ACTIVE = true
+                    sendMessage(key.remoteJid, {text: "Oke siap noted Pak Bos fitur GPT sudah diaktifkan"}, {quoted: msg})
+                } else {
+                    sendMessage(key.remoteJid, {text: "Sorry Pak Bos fitur GPT sudah aktif"}, {quoted: msg})
+                }
+                return
+            }
+
+            if (startWithInactive) {
+                if (GPT_ACTIVE === true) {
+                    GPT_ACTIVE = false
+                    sendMessage(key.remoteJid, {text: "Oke siap noted Pak Bos fitur GPT sudah dinonaktifkan"}, {quoted: msg})
+                } else {
+                    sendMessage(key.remoteJid, {text: "Sorry Pak Bos fitur GPT sudah tidak aktif"}, {quoted: msg})
+                }
+            }
+
+        } else {
+            if (key.fromMe === true) return
+            sendMessage(key.remoteJid, {text: "```Exception in thread \"main\" java.lang.IllegalArgumentException: Maaf anda bukan Pak Bos```"}, {quoted: msg})
+        }
     }
 
     const handleGPTMessage = async (msg) => {
         const {key, message} = msg
         const text = getText(message)
 
-        const MIMIN_PREFIX = "!yeyen"
-        if (!text.startsWith(MIMIN_PREFIX)) return
+        if (GPT_ACTIVE === false) {
+            let reply = "Mohon maaf GPT sedang tidur..., tunggu sampai developer mengubah env ```GPT_ACTIVE``` ke ```true```"
+            sendMessage(key.remoteJid, {text: reply}, {quoted: msg})
+            return
+        }
 
         let chat = text.slice(MIMIN_PREFIX.length, text.length)
         if (chat === "") return
@@ -66,21 +97,14 @@ async function init() {
     }
 
     const handleMiminMessage = async (msg) => {
-        const {key, message} = msg
-        const text = getText(message)
-
-        const MIMIN_PREFIX = "!mimin"
-        if (!text.startsWith(MIMIN_PREFIX)) return
+        const {key} = msg
 
         const reply = "Daleemm sayang..."
         sendMessage(key.remoteJid, {text: reply}, {quoted: msg})
     }
 
     const handleTagAllMemberInGroup = async (msg) => {
-        const {key, message} = msg
-        const text = getText(message)
-
-        if (!text.toLowerCase().includes("@all")) return
+        const {key} = msg
 
         // 1. Get group members
         const group = await sock.groupMetadata(key.remoteJid)
@@ -90,7 +114,7 @@ async function init() {
         const mentions = []
         const items = []
 
-        members.forEach(({ id, admin }) => {
+        members.forEach(({id, admin}) => {
             console.log(id)
             mentions.push(id)
             items.push(`@${id.split("@")[0]}${admin ? ' *(ADMIN)* ' : ''}`)
@@ -101,6 +125,30 @@ async function init() {
             {text: "Daftar member group: \n\n" + items.join("\n") + `\n\nTotal member: *${mentions.length}*`, mentions},
             {quoted: msg}
         )
+    }
+
+    const handleMessage = async (msg) => {
+        const {key, message} = msg
+        const text = getText(message)
+
+        const startWithActive = text === PREFIX_ACTIVE
+        const startWithInactive = text === PREFIX_INACTIVE
+        const groupRemoteJis = "@g.us"
+
+        if (!key.remoteJid.includes(groupRemoteJis)) return
+
+        if (text.toLowerCase().includes("@all")) {
+            handleTagAllMemberInGroup(msg)
+        } else if (text.startsWith(MIMIN_PREFIX)) {
+            handleMiminMessage(msg)
+        } else if (text.startsWith(GPT_PREFIX)) {
+            handleGPTMessage(msg)
+        } else if (startWithActive || startWithInactive) {
+            handleActivationGPT(msg)
+        } else if (text.startsWith(GPT_STATUS_PREFIX)) {
+            const reply = `STATUS GPT: ${GPT_ACTIVE ? "*Active*" : "*Tidak aktif*"}`
+            sendMessage(key.remoteJid, {text: reply}, {quoted: msg})
+        }
     }
 
     sock.ev.process(async (events) => {
@@ -126,9 +174,7 @@ async function init() {
                 if (!msg.message) return
                 // processing
                 console.log(hidePrivateData(msg))
-                handleTagAllMemberInGroup(msg)
-                handleMiminMessage(msg)
-                handleGPTMessage(msg)
+                handleMessage(msg)
             })
         }
     })
