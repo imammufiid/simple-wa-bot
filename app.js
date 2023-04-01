@@ -64,13 +64,19 @@ async function init() {
 
         } else {
             if (key.fromMe === true) return
-            sendMessage(key.remoteJid, {text: "```Exception in thread \"main\" java.lang.IllegalArgumentException: Maaf anda bukan Pak Bos```"}, {quoted: msg})
+            sendMessage(key.remoteJid, {text: "```Exception in thread \"main\" IllegalArgumentException: Maaf anda bukan Pak Bos```"}, {quoted: msg})
         }
     }
 
     const handleGPTMessage = async (msg) => {
         const {key, message} = msg
         const text = getText(message)
+
+        const groupRemoteJis = "@g.us"
+        if (!key.remoteJid.endsWith(groupRemoteJis)) {
+            sendMessage(key.remoteJid, {text: "GPT tidak bisa digunakan di chat pribadi"}, {quoted: msg})
+            return
+        }
 
         if (GPT_ACTIVE === false) {
             let reply = "Mohon maaf GPT sedang tidur..., tunggu sampai developer mengubah env ```GPT_ACTIVE``` ke ```true```"
@@ -135,7 +141,7 @@ async function init() {
         const startWithInactive = text === PREFIX_INACTIVE
         const groupRemoteJis = "@g.us"
 
-        if (!key.remoteJid.includes(groupRemoteJis)) return
+        if (!key.remoteJid.endsWith(groupRemoteJis)) return
 
         if (text.toLowerCase().includes("@all")) {
             handleTagAllMemberInGroup(msg)
@@ -181,3 +187,7 @@ async function init() {
 }
 
 init()
+
+setTimeout(() => {
+    process.exit(0);
+}, 3600000) // 1 hours
