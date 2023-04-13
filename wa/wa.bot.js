@@ -5,13 +5,15 @@ let {
     GPT_STATUS_PREFIX,
     MIMIN_PREFIX,
     ACTIVE_PREFIX,
-    INACTIVE_PREFIX
+    INACTIVE_PREFIX,
+    BUKBER_PREFIX
 } = require('../utils/utils')
 const {gptCompletion} = require('../gpt/chat.gpt')
 const makeWaSocket = require('@adiwajshing/baileys').default
 const {
     DisconnectReason, useMultiFileAuthState
 } = require('@adiwajshing/baileys')
+const repl = require("repl");
 
 const store = {}
 
@@ -19,6 +21,8 @@ const getMessage = key => {
     const {id} = key
     if (store[id]) return store[id].message
 }
+
+const bukberMembers = []
 
 const getText = (message) => {
     try {
@@ -39,8 +43,9 @@ const handleActivationGPT = async (msg, socket) => {
     if (pushName === 'Imam Mufiid') {
         if (startWithActive) {
             if (GPT_ACTIVE === false) {
-                GPT_ACTIVE = true
-                sendMessage(socket, key.remoteJid, {text: "Oke siap noted Pak Bos fitur GPT sudah diaktifkan"}, {quoted: msg})
+                // GPT_ACTIVE = true
+                // sendMessage(socket, key.remoteJid, {text: "Oke siap noted Pak Bos fitur GPT sudah diaktifkan"}, {quoted: msg})
+                sendMessage(socket, key.remoteJid, {text: "Sorry pak bos, udah kena limit"}, {quoted: msg})
             } else {
                 sendMessage(socket, key.remoteJid, {text: "Sorry Pak Bos fitur GPT sudah aktif"}, {quoted: msg})
             }
@@ -143,13 +148,48 @@ const handleMessage = async (msg, socket) => {
     } else if (text.startsWith(MIMIN_PREFIX)) {
         handleMiminMessage(msg, socket)
     } else if (text.startsWith(GPT_PREFIX)) {
-        handleGPTMessage(msg, socket)
+        // handleGPTMessage(msg, socket)
+        sendMessage(socket, key.remoteJid, {text: "GPT sudah tidak aktif"}, {quoted: msg})
     } else if (startWithActive || startWithInactive) {
-        handleActivationGPT(msg, socket)
+        // handleActivationGPT(msg, socket)
+        sendMessage(socket, key.remoteJid, {text: "GPT sudah tidak aktif"}, {quoted: msg})
     } else if (text.startsWith(GPT_STATUS_PREFIX)) {
         const reply = `STATUS GPT: ${GPT_ACTIVE ? "*Active*" : "*Tidak aktif*"}`
         sendMessage(socket, key.remoteJid, {text: reply}, {quoted: msg})
+    } else if (text.startsWith(BUKBER_PREFIX)) {
+        handleBukberRegistration(msg, socket)
     }
+}
+
+const handleBukberRegistration = async (msg, socket) => {
+    const {key, message} = msg
+    const text = getText(message)
+
+    let member = text.slice(BUKBER_PREFIX.length, text.length).trim()
+    if (member === "") {
+        sendMessage(socket, key.remoteJid, {text: "Mohon masukkan nama\n\n*Cara daftar bukber:*\nKetik: !regbukber <nama>"}, {quoted: msg})
+        return
+    }
+    const regex = /\[|\]/g;
+    if (regex.test(member)) {
+        console.log("The string contains brackets []");
+        let clean = member.replace(regex, "")
+        let regs = clean.split(",")
+        regs.forEach((member, index) => {
+            bukberMembers.push(member.trim())
+        })
+    } else {
+        console.log("The string does not contain brackets []");
+        bukberMembers.push(member.trim())
+    }
+
+    let reply = "List yuk seng pasti Hadir tgl 19 \n\n"
+    bukberMembers.forEach((member, index) => {
+        reply += `${index+1}. ${member}\n`
+    })
+
+    reply += `\n*Total: ${bukberMembers.length}*`
+    sendMessage(socket, key.remoteJid, {text: reply}, {quoted: msg})
 }
 
 const createWaBot = async () => {
@@ -162,6 +202,7 @@ const createWaBot = async () => {
     })
 
     sock.ev.process(async (events) => {
+        console.log(events)
         if (events["connection.update"]) {
             const {connection, lastDisconnect} = events["connection.update"]
             if (connection === 'close') {
@@ -177,13 +218,19 @@ const createWaBot = async () => {
             await saveCreds()
         }
 
+        if (events["group-participants.update"]) {
+            const {id, participants, action} = events["group-participants.update"]
+            console.log(id)
+            console.log(participants)
+            console.log(action)
+        }
+
         if (events["messages.upsert"]) {
             const {messages} = events["messages.upsert"]
-
             messages.forEach(msg => {
                 if (!msg.message) return
                 // processing
-                console.log(hidePrivateData(msg))
+                // console.log(hidePrivateData(msg))
                 handleMessage(msg, sock)
             })
         }

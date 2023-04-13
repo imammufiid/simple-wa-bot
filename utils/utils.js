@@ -22,6 +22,7 @@ const GPT_PREFIX = "!gpt"
 const GPT_STATUS_PREFIX = "!statusgpt"
 const ACTIVE_PREFIX = "!activategpt"
 const INACTIVE_PREFIX = "!deactivategpt"
+const BUKBER_PREFIX = "!regbukber"
 const TIME_LIMIT_RUNNING = (60 * 60 * 1000)
 
 module.exports = {
@@ -33,5 +34,6 @@ module.exports = {
     INACTIVE_PREFIX,
     TIME_LIMIT_RUNNING,
     GPT_ACTIVE,
-    MIMIN_PREFIX
+    MIMIN_PREFIX,
+    BUKBER_PREFIX
 }

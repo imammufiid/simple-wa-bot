@@ -15,6 +15,6 @@ console.log(JSON.stringify({start: dateFormat(dateRun), end: getOneHourLater(dat
 console.log("******** ******* ******* ********")
 
 setTimeout(() => {
-    process.exit(0);
     console.log("******** Server berhenti " + new Date() + " ********")
+    process.exit(0);
 }, TIME_LIMIT_RUNNING) // 1 hours
